@@ -6,6 +6,7 @@ import { NodeDefaultsConfig } from "@/types";
 import { ModelSearchDialog } from "@/components/modals/ModelSearchDialog";
 import { ProviderModel } from "@/lib/providers/types";
 import { loadNodeDefaults, saveNodeDefaults } from "@/store/utils/localStorage";
+import { ComfyMark } from "@/components/icons/ComfyMark";
 
 // Provider icons
 const GeminiIcon = () => (
@@ -46,6 +47,8 @@ const getProviderIcon = (provider: string) => {
       return <FalIcon />;
     case "wavespeed":
       return <WaveSpeedIcon />;
+    case "comfy":
+      return <ComfyMark />;
     default:
       return null;
   }

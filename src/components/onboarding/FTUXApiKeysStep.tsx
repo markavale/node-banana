@@ -6,6 +6,7 @@ import { FTUXStepProps } from "@/types/ftux";
 import { ProviderType } from "@/types";
 import { EnvStatusResponse } from "@/app/api/env-status/route";
 import { useWorkflowStore } from "@/store/workflowStore";
+import { ComfyMark } from "@/components/icons/ComfyMark";
 
 // Provider icons
 const GeminiIcon = () => (
@@ -55,6 +56,8 @@ const WaveSpeedIcon = () => (
   </svg>
 );
 
+const ComfyIcon = () => <ComfyMark className="w-4 h-4" />;
+
 interface ProviderInfo {
   id: ProviderType;
   name: string;
@@ -71,6 +74,7 @@ const providers: ProviderInfo[] = [
   { id: "replicate", name: "Replicate", icon: ReplicateIcon, apiKeyUrl: "https://replicate.com/account/api-tokens" },
   { id: "kie", name: "Kie.ai", icon: KieIcon, apiKeyUrl: "https://kie.ai/api-key" },
   { id: "wavespeed", name: "WaveSpeed", icon: WaveSpeedIcon, apiKeyUrl: "https://wavespeed.ai/accesskey" },
+  { id: "comfy", name: "ComfyUI", icon: ComfyIcon, apiKeyUrl: "https://platform.comfy.org/profile/api-keys?onboarding=router" },
 ];
 
 export function FTUXApiKeysStep({}: FTUXStepProps) {
@@ -85,6 +89,7 @@ export function FTUXApiKeysStep({}: FTUXStepProps) {
     fal: false,
     kie: false,
     wavespeed: false,
+    comfy: false,
   });
   const [localKeys, setLocalKeys] = useState<Record<ProviderType, string>>(() => {
     const keys: Record<ProviderType, string> = {
@@ -95,6 +100,7 @@ export function FTUXApiKeysStep({}: FTUXStepProps) {
       fal: "",
       kie: "",
       wavespeed: "",
+      comfy: "",
     };
     for (const id of Object.keys(keys) as ProviderType[]) {
       const saved = providerSettings.providers[id]?.apiKey;

@@ -58,7 +58,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
   const adaptiveOutputImage = useAdaptiveImageSrc(data.outputImage, id);
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, openaiApiKey, replicateEnabled, kieEnabled, openaiEnabled } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, openaiApiKey, comfyApiKey, comfyEnabled, replicateEnabled, kieEnabled, openaiEnabled } = useProviderApiKeys();
   const [externalModels, setExternalModels] = useState<ProviderModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
@@ -74,6 +74,16 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
   // Inline parameters infrastructure
   const { inlineParametersEnabled } = useInlineParameters();
   const showLabels = useShowHandleLabels(selected);
+  // Comfy Router models can declare several image inputs (a mask, a garment);
+  // the first uses the fixed "image" handle and the rest get their own. Other
+  // providers keep the node's static image and prompt handles.
+  const imageSchemaInputs = useMemo(
+    () =>
+      nodeData.selectedModel?.provider === "comfy"
+        ? (nodeData.inputSchema ?? []).filter((input) => input.type === "image")
+        : [],
+    [nodeData.inputSchema, nodeData.selectedModel?.provider]
+  );
 
   // Register browse callback for floating header button
   useEffect(() => {
@@ -103,8 +113,12 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     if (openaiEnabled && openaiApiKey) {
       providers.push({ id: "openai", name: "OpenAI" });
     }
+    // Add ComfyUI (Comfy Router) if a key is available (its own or the Comfy Cloud key)
+    if (comfyEnabled && comfyApiKey) {
+      providers.push({ id: "comfy", name: "ComfyUI" });
+    }
     return providers;
-  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, openaiEnabled, openaiApiKey]);
+  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, openaiEnabled, openaiApiKey, comfyEnabled, comfyApiKey]);
 
   // Migrate legacy data: derive selectedModel from model field if missing
   useEffect(() => {
@@ -144,6 +158,9 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
       if (openaiApiKey) {
         headers["X-OpenAI-API-Key"] = openaiApiKey;
       }
+      if (comfyApiKey) {
+        headers["X-Comfy-Router-Key"] = comfyApiKey;
+      }
       const response = await deduplicatedFetch(`/api/models?provider=${currentProvider}&capabilities=${capabilities}`, { headers });
       if (response.ok) {
         const data = await response.json();
@@ -166,7 +183,7 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
     } finally {
       setIsLoadingModels(false);
     }
-  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey, openaiApiKey]);
+  }, [currentProvider, replicateApiKey, falApiKey, kieApiKey, openaiApiKey, comfyApiKey]);
 
   useEffect(() => {
     fetchModels();
@@ -578,8 +595,26 @@ export function GenerateImageNode({ id, data, selected }: NodeProps<NanoBananaNo
         data-handletype="image"
         isConnectable={true}
       />
-      {/* Image label */}
-      <HandleLabel label="Image" side="target" color="var(--handle-color-image)" top="calc(35% - 18px)" visible={showLabels} />
+      {/* Image label: the model's name for its first image input when it has one */}
+      <HandleLabel label={imageSchemaInputs[0]?.label ?? "Image"} side="target" color="var(--handle-color-image)" top="calc(35% - 18px)" visible={showLabels} />
+      {/* Further image inputs the model declares (a mask, a garment), between the image and the prompt.
+          `image-N` maps to the Nth image input in connectedInputs. */}
+      {imageSchemaInputs.slice(1).map((input, index, extra) => {
+        const top = `${35 + ((index + 1) * 30) / (extra.length + 1)}%`;
+        return (
+          <React.Fragment key={input.name}>
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={`image-${index + 1}`}
+              style={{ top, zIndex: 10 }}
+              data-handletype="image"
+              isConnectable={true}
+            />
+            <HandleLabel label={input.label} side="target" color="var(--handle-color-image)" top={`calc(${top} - 18px)`} visible={showLabels} />
+          </React.Fragment>
+        );
+      })}
       <Handle
         type="target"
         position={Position.Left}

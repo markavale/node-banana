@@ -19,7 +19,8 @@ export type ModelCapability =
   | "text-to-3d"
   | "image-to-3d"
   | "text-to-audio"
-  | "audio-to-video";
+  | "audio-to-video"
+  | "video-to-video";
 
 /**
  * Model parameter schema for dynamic UI generation

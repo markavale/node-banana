@@ -133,9 +133,13 @@ export function getComfySettings(): ComfySettings {
   }
 }
 
+/** Fired on `window` after the settings are saved, so stores that mirror a field can refresh. */
+export const COMFY_SETTINGS_CHANGED_EVENT = "node-banana:comfy-settings-changed";
+
 export function saveComfySettings(settings: ComfySettings): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(COMFY_SETTINGS_KEY, JSON.stringify(normalizeComfySettings(settings)));
+  window.dispatchEvent(new Event(COMFY_SETTINGS_CHANGED_EVENT));
 }
 
 /* ── connection resolution ─────────────────────────────────────── */

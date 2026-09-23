@@ -58,6 +58,7 @@ Node Banana is a node-based workflow editor for AI media generation. Drag nodes 
 | [fal.ai](https://fal.ai/) | Supported |
 | [Kie.ai](https://kie.ai/) | Supported |
 | [WaveSpeed](https://wavespeed.ai/) | Supported |
+| [ComfyUI](https://platform.comfy.org/) (Comfy Router: Flux, GPT Image, Nano Banana, Seedream, Kling, Veo, Runway, LTX and more) | Supported |
 | [OpenAI](https://openai.com/) | LLM only |
 
 ## Getting Started
@@ -90,6 +91,7 @@ REPLICATE_API_KEY=your_replicate_api_key    # Optional
 FAL_API_KEY=your_fal_api_key                # Optional
 KIE_API_KEY=your_kie_api_key                # Optional
 WAVESPEED_API_KEY=your_wavespeed_api_key    # Optional
+COMFY_API_KEY=your_comfy_api_key            # Optional, ComfyUI-hosted models via Comfy Router
 ```
 
 API keys can also be entered in the app (Settings → Providers), which is the

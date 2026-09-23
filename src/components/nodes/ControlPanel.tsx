@@ -70,7 +70,7 @@ const LLM_MODELS: Record<LLMProvider, { value: LLMModelType; label: string }[]> 
 };
 
 // Image/video/audio/3d generation capabilities
-const VIDEO_CAPABILITIES: ModelCapability[] = ["text-to-video", "image-to-video"];
+const VIDEO_CAPABILITIES: ModelCapability[] = ["text-to-video", "image-to-video", "video-to-video"];
 const AUDIO_CAPABILITIES: ModelCapability[] = ["text-to-audio"];
 const MODEL_3D_CAPABILITIES: ModelCapability[] = ["text-to-3d", "image-to-3d"];
 
@@ -191,7 +191,7 @@ function GenerateImageControls({ node }: { node: Node }) {
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const regenerateNode = useWorkflowStore((state) => state.regenerateNode);
   const isRunning = useWorkflowStore((state) => state.isRunning);
-  const { replicateApiKey, kieApiKey, openaiApiKey, replicateEnabled, kieEnabled, openaiEnabled } = useProviderApiKeys();
+  const { replicateApiKey, kieApiKey, openaiApiKey, comfyApiKey, comfyEnabled, replicateEnabled, kieEnabled, openaiEnabled } = useProviderApiKeys();
   const [isBrowseDialogOpen, setIsBrowseDialogOpen] = useState(false);
 
   const currentProvider: ProviderType = nodeData.selectedModel?.provider || "gemini";
@@ -210,8 +210,11 @@ function GenerateImageControls({ node }: { node: Node }) {
     if (openaiEnabled && openaiApiKey) {
       providers.push({ id: "openai", name: "OpenAI" });
     }
+    if (comfyEnabled && comfyApiKey) {
+      providers.push({ id: "comfy", name: "ComfyUI" });
+    }
     return providers;
-  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, openaiEnabled, openaiApiKey]);
+  }, [replicateEnabled, replicateApiKey, kieEnabled, kieApiKey, openaiEnabled, openaiApiKey, comfyEnabled, comfyApiKey]);
 
   const handleAspectRatioChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {

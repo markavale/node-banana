@@ -85,7 +85,7 @@ function ModelParametersInner({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Use stable selector for API keys to prevent unnecessary re-fetches
-  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey } = useProviderApiKeys();
+  const { replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, comfyApiKey } = useProviderApiKeys();
 
   // Fetch schema when modelId changes
   useEffect(() => {
@@ -130,6 +130,9 @@ function ModelParametersInner({
         if (wavespeedApiKey) {
           headers["X-WaveSpeed-Key"] = wavespeedApiKey;
         }
+        if (comfyApiKey) {
+          headers["X-Comfy-Router-Key"] = comfyApiKey;
+        }
 
         const encodedModelId = encodeURIComponent(modelId);
         const response = await deduplicatedFetch(
@@ -173,7 +176,7 @@ function ModelParametersInner({
     return () => {
       cancelled = true;
     };
-  }, [modelId, provider, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, onInputsLoaded]);
+  }, [modelId, provider, replicateApiKey, falApiKey, kieApiKey, wavespeedApiKey, comfyApiKey, onInputsLoaded]);
 
   // Pre-populate schema defaults into parameters
   useEffect(() => {
@@ -320,8 +323,10 @@ function ParameterInputInner({ param, name, value, onChange }: ParameterInputPro
   const handleChange = useCallback((value: unknown) => {
     onChange(name, value);
   }, [name, onChange]);
+  // snake_case and camelCase (Google's aspectRatio, imageSize) both read as words.
   const displayName = param.name
     .replace(/_/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
   // Local state for text/number inputs to prevent cursor jumping

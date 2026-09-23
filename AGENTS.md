@@ -20,6 +20,7 @@ Create `.env.local` in the root directory:
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key  # Optional, for OpenAI LLM provider
 KIE_API_KEY=your_kie_api_key        # Optional, for Kie.ai models (Sora, Veo, Kling, etc.)
+COMFY_API_KEY=your_comfy_api_key    # Optional, for ComfyUI-hosted models via Comfy Router (Flux, GPT Image, Nano Banana, Kling, Veo, etc.)
 ```
 
 ## Architecture Overview
@@ -186,11 +187,11 @@ Use separate entries for each capability variant (e.g., `model/text-to-video` an
 Define `parameters` (user-configurable settings) and `inputs` (connectable handles like prompt, images).
 
 ### Step 4: Add Default Parameters
-**File:** `src/app/api/generate/route.ts` — Add case to `getKieModelDefaults()`.
+**File:** `src/app/api/generate/providers/kie.ts` — Add case to `getKieModelDefaults()`.
 Provide required defaults that must be present even if the user doesn't set them.
 
 ### Step 5: Add Image Input Key Mapping
-**File:** `src/app/api/generate/route.ts` — Add to `getKieImageInputKey()`.
+**File:** `src/app/api/generate/providers/kie.ts` — Add to `getKieImageInputKey()`.
 Map the model to its correct image parameter name if it differs from the default `image_urls`.
 
 ### Step 6: Handle Non-Standard API (if applicable)
@@ -200,13 +201,31 @@ If the model uses different endpoints than `/api/v1/jobs/createTask` and `/api/v
 - Add a custom polling function for the model's status endpoint
 - Add a branch in the Kie request-building logic (see `src/app/api/generate/providers/kie.ts`) for the custom request format
 
+## Adding Comfy Router Models
+
+Comfy Router (`https://api.comfy.org/v2/models/{provider}/{model}`, header `X-API-Key`) fronts ~240 partner models behind one Comfy key and forwards each partner's native request and response. Provider id is `comfy`, shown as "ComfyUI"; the key falls back to the Comfy Cloud key from the ComfyUI settings.
+
+Discovery and settings are live; wire formats are data:
+
+- **Which models exist:** `GET /v2/models` (paginated, needs the key), cached ten minutes. The browser offers every *bound* model the Router currently serves.
+- **Settings:** each model's published schema — `GET /v2/models/{id}/openapi.json` with the key, or `https://docs.comfy.org/router-schemas/{id}.json` without — cached six hours. `schema.ts` turns the request schema into the node's parameters (types, enums, ranges, defaults, descriptions); nothing about a setting is typed by hand unless the schema is looser than the partner.
+- **Wire formats:** `src/lib/providers/comfyRouter/families.json` — one *family* per partner request format: a request template (`body`), the media handles it fills and how each is encoded (`base64`, `dataUrl`, or `url` = uploaded to Comfy storage first), where its settings live in the schema (`params.at`/`exclude`), per-setting `paramOverrides` (enum, default, value), and where the output or the partner's error sits in the response (`result.media`/`errors`). The binding language is documented at the top of `template.ts`. Models the app cannot drive are listed under `excluded` with the reason.
+- **New model of a known format:** add it to that family's `models` (id, name, description, capabilities, any per-model overrides). **New format:** add a family.
+- **Checks:** `npm run comfy:router-sync` downloads every schema into `.scratch/comfy-router-schemas` and lists Router models that are neither bound nor excluded. Then `npx vitest run src/lib/providers/comfyRouter/__tests__/routerSchemas.test.ts` validates the smallest and fullest request of every bound model against its schema (Ajv) and checks each result path exists in the response schema. `src/app/api/generate/providers/__tests__/comfy.test.ts` pins bodies and result readings for the main formats.
+- **Transport:** always the queue (`POST …/requests` → poll `…/requests/{id}/status` respecting `Retry-After` → `GET …/requests/{id}`), with an `Idempotency-Key` per submit — synchronous partners (OpenAI, Qwen) work through it too. The generate route returns the polling envelope with `pollProvider: "comfy"` and `/api/generate/poll` finishes the run. Binary answers (ElevenLabs) become audio; 3D models return as their URL.
+- **Masks:** partners disagree. OpenAI edits where the mask is transparent; FLUX Fill and Bria edit where it is white.
+
 ## API Routes
 
 All routes in `src/app/api/`:
 
 | Route | Timeout | Purpose |
 |-------|---------|---------|
-| `/api/generate` | 5 min | Image generation via Gemini |
+| `/api/generate` | 10 min | Image/video generation, dispatched by `selectedModel.provider`; async providers (Kie, Comfy) return a polling envelope |
+| `/api/generate/poll` | 2 min | Finish an async run (Kie, Comfy Router) |
+| `/api/models` | default | Model registry across providers (`?provider=`, `?search=`) |
+| `/api/models/[modelId]` | default | Per-model parameters and inputs |
+| `/api/env-status` | default | Which provider keys the server has from `.env` |
 | `/api/llm` | 1 min | Text generation (Google/OpenAI) |
 | `/api/workflow` | default | Save/load workflow files |
 | `/api/save-generation` | default | Auto-save generated images |
@@ -215,6 +234,7 @@ All routes in `src/app/api/`:
 ## localStorage Keys
 
 - `node-banana-workflow-configs` - Project metadata (paths)
+- `node-banana-provider-settings` - Provider API keys and enabled flags (the `comfy` entry falls back to `node-banana-comfy-settings`' cloud key)
 - `node-banana-workflow-costs` - Cost tracking per workflow
 - `node-banana-nanoBanana-defaults` - Sticky generation settings
 

@@ -966,4 +966,80 @@ describe("/api/models route", () => {
       expect(data.models.find((m: { id: string }) => m.id === "obscure/flux-rare")).toBeDefined();
     });
   });
+
+  describe("Comfy Router provider", () => {
+    // The Router's live list: three bound models and one the app does not drive.
+    const LIVE = ["bfl/flux-2-pro", "bfl/flux-2-max", "veo/veo-3.1-generate-001", "anthropic/claude-opus-5"];
+
+    beforeEach(() => {
+      // The key is resolved from the header, then either Comfy env var
+      delete process.env.COMFY_API_KEY;
+      delete process.env.COMFY_CLOUD_API_KEY;
+      mockFetch.mockImplementation((url: string) => {
+        if (String(url).startsWith("https://api.comfy.org/v2/models")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ data: LIVE.map((id) => ({ id })), has_more: false, next_cursor: null }),
+          });
+        }
+        return Promise.reject(new Error(`unexpected fetch ${url}`));
+      });
+    });
+
+    it("GET: provider=comfy offers the bound models the Router serves", async () => {
+      const request = createMockGetRequest(
+        { provider: "comfy" },
+        { "X-Comfy-Router-Key": "test-comfy-key" }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.models.map((m: { id: string }) => m.id).sort()).toEqual(["bfl/flux-2-max", "bfl/flux-2-pro", "veo/veo-3.1-generate-001"]);
+      expect(data.models.every((m: { provider: string }) => m.provider === "comfy")).toBe(true);
+      expect(data.providers.comfy).toEqual({ success: true, count: 3, cached: true });
+      expect(data.availableProviders).toContain("comfy");
+      // The list is read with the user's key
+      expect(mockFetch.mock.calls[0][1].headers["X-API-Key"]).toBe("test-comfy-key");
+    });
+
+    it("GET: provider=comfy without any key returns 400", async () => {
+      const request = createMockGetRequest({ provider: "comfy" });
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe(
+        "Comfy API key required. Add COMFY_API_KEY to .env.local or configure in Settings."
+      );
+    });
+
+    it("GET: provider=comfy with a search query filters the catalog", async () => {
+      process.env.COMFY_API_KEY = "env-comfy-key";
+      const request = createMockGetRequest({ provider: "comfy", search: "flux" });
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.models.map((m: { id: string }) => m.id).sort()).toEqual(["bfl/flux-2-max", "bfl/flux-2-pro"]);
+      expect(data.providers.comfy.count).toBe(2);
+    });
+
+    it("GET: comfy models join the aggregate when COMFY_CLOUD_API_KEY is set", async () => {
+      process.env.COMFY_CLOUD_API_KEY = "env-cloud-key";
+      const request = createMockGetRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // 8 gemini models (always included) + the three bound Router models
+      expect(data.models).toHaveLength(8 + 3);
+      expect(data.providers.gemini.count).toBe(8);
+      expect(data.providers.comfy.count).toBe(3);
+      expect(data.availableProviders).toEqual(expect.arrayContaining(["gemini", "comfy"]));
+    });
+  });
 });
